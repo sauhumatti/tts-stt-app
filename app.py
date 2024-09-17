@@ -45,13 +45,15 @@ class TTSThread(QThread):
             logging.error(f"Error in TTSThread: {str(e)}")
             self.signals.finished.emit(f"Error: {str(e)}")
 
-class TranscribeThread(QThread):
+class TranscribeSignals(QObject):
     finished = Signal(str)
 
+class TranscribeThread(QThread):
     def __init__(self, client, audio_file):
         super().__init__()
         self.client = client
         self.audio_file = audio_file
+        self.signals = TranscribeSignals()
 
     def run(self):
         try:
@@ -60,10 +62,10 @@ class TranscribeThread(QThread):
                     model="whisper-1", 
                     file=audio_file
                 )
-            self.finished.emit(transcript.text)
+            self.signals.finished.emit(transcript.text)
         except Exception as e:
             logging.error(f"Error in TranscribeThread: {str(e)}")
-            self.finished.emit(f"Error: {str(e)}")
+            self.signals.finished.emit(f"Error: {str(e)}")
 
 class TTSSTTApp(QWidget):
     def __init__(self):
@@ -155,12 +157,13 @@ class TTSSTTApp(QWidget):
         if audio_file:
             self.audio_file = audio_file
             self.transcribe_button.setEnabled(True)
+            self.text_input.setText(f"Audio file loaded: {audio_file}")
             QMessageBox.information(self, "File Loaded", f"Audio file loaded: {audio_file}")
 
     def transcribe_audio(self):
         if hasattr(self, 'audio_file'):
             self.transcribe_thread = TranscribeThread(self.client, self.audio_file)
-            self.transcribe_thread.finished.connect(self.on_transcribe_finished)
+            self.transcribe_thread.signals.finished.connect(self.on_transcribe_finished)
             self.transcribe_button.setEnabled(False)
             self.transcribe_thread.start()
         else:
